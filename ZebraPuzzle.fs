@@ -60,6 +60,14 @@ let initialHouses = [
 ]
 
 let ColorIndex, OwnerNationalityIndex, OwnerPetIndex, OwnerDrinkIndex, OwnerCigaretteBrandIndex = (0, 1, 2, 3, 4)
+
+let indexFromProperty = function
+    | Color _ -> ColorIndex
+    | OwnerNationality _ -> OwnerNationalityIndex
+    | OwnerPet _ -> OwnerPetIndex
+    | OwnerDrink _ -> OwnerDrinkIndex
+    | OwnerCigaretteBrand _ -> OwnerCigaretteBrandIndex
+    | _ -> -1
     
 type PredicateResult = Undefined | Success | Failure
 type Predicate =
@@ -124,6 +132,21 @@ let allPets = [
 let rec cartesian = function
   | [] -> Seq.singleton []
   | L::Ls -> cartesian Ls |> Seq.collect (fun C -> L |> Seq.map (fun x->x::C))
+  
+let rec isPropertyDefined (house: House) (property: HouseProperty) =
+    let isHousePropertyDefined = isPropertyDefined house
+    match (property, indexFromProperty property) with
+    | Pair (p1, p2), _ -> isHousePropertyDefined p1 || isHousePropertyDefined p2
+    | prop, index when index >= 0 -> house[index] <> Unknown
+    | _ -> false
+    
+let rec applyProperty (property: HouseProperty) (house: House) =
+    let isHousePropertyDefined = isPropertyDefined house
+    match property with
+    | Unknown -> house
+    | Pair (p1,p2) when isHousePropertyDefined p1 || isHousePropertyDefined p2 -> house
+    | Pair (p1,p2) -> applyProperty p1 house |> applyProperty p2
+    | _ -> List.updateAt (indexFromProperty property) property house
   
 //
 // let permute list =
