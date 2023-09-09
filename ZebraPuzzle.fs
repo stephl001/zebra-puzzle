@@ -133,20 +133,74 @@ let rec cartesian = function
   | [] -> Seq.singleton []
   | L::Ls -> cartesian Ls |> Seq.collect (fun C -> L |> Seq.map (fun x->x::C))
   
-let rec isPropertyDefined (house: House) (property: HouseProperty) =
-    let isHousePropertyDefined = isPropertyDefined house
+let rec isPropertyDefined (property: HouseProperty) (house: House) =
     match (property, indexFromProperty property) with
-    | Pair (p1, p2), _ -> isHousePropertyDefined p1 || isHousePropertyDefined p2
+    | Pair (p1, p2), _ -> isPropertyDefined p1 house || isPropertyDefined p2 house
     | prop, index when index >= 0 -> house[index] <> Unknown
     | _ -> false
     
 let rec applyProperty (property: HouseProperty) (house: House) =
-    let isHousePropertyDefined = isPropertyDefined house
     match property with
     | Unknown -> house
-    | Pair (p1,p2) when isHousePropertyDefined p1 || isHousePropertyDefined p2 -> house
+    | Pair (p1,p2) when isPropertyDefined p1 house || isPropertyDefined p2 house -> house
     | Pair (p1,p2) -> applyProperty p1 house |> applyProperty p2
     | _ -> List.updateAt (indexFromProperty property) property house
+   
+let applyPropertyOnHouses (property: HouseProperty) (houses: House list) =
+    match List.tryFindIndex (not << isPropertyDefined property) houses with
+    | Some idx -> List.updateAt idx (applyProperty property houses[idx]) houses
+    | None -> houses
+    
+type HousePairPredicate = House -> House -> bool
+
+let ``The green house is immediately to the right of the ivory house`` (house1: House) (house2: House) =
+    (house1[ColorIndex] = Color Green && house2[ColorIndex] = Color Ivory) || (house1[ColorIndex] = Color Ivory && house2[ColorIndex] = Color Green)
+
+let ``The man who smokes Chesterfields lives in the house next to the man with the fox`` (house1: House) (house2: House) =
+    (house1[OwnerCigaretteBrandIndex] = OwnerCigaretteBrand Chesterfields && house2[OwnerPetIndex] = OwnerPet Fox) ||
+    (house1[OwnerPetIndex] = OwnerPet Fox && house2[OwnerCigaretteBrandIndex] = OwnerCigaretteBrand Chesterfields)
+
+let ``Kools are smoked in the house next to the house where the horse is kept`` (house1: House) (house2: House) =
+    (house1[OwnerCigaretteBrandIndex] = OwnerCigaretteBrand Kools && house2[OwnerPetIndex] = OwnerPet Horse) ||
+    (house1[OwnerPetIndex] = OwnerPet Horse && house2[OwnerCigaretteBrandIndex] = OwnerCigaretteBrand Kools)
+    
+let housePredicates:  HousePairPredicate list = [
+    ``The green house is immediately to the right of the ivory house``
+    ``The man who smokes Chesterfields lives in the house next to the man with the fox``
+    ``Kools are smoked in the house next to the house where the horse is kept``
+]
+
+let allProperties = [
+    allColors
+    allNationalities
+    allPets
+    allDrinks
+    allCigarettes
+]
+
+let isValidHouse =
+    List.exists ((=) Unknown) >> not
+    
+let isValidHouseConfiguration =
+    List.forall isValidHouse
+    
+    
+let permute list =
+  let rec inserts e = function
+    | [] -> [[e]]
+    | x::xs as list -> (e::list)::[for xs' in inserts e xs -> x::xs']
+
+  List.fold (fun accum x -> List.collect (inserts x) accum) [[]] list
+  
+let rec solve (houses: House list) (properties: HouseProperty list list) =
+    let applyPropOnHouses h p = applyPropertyOnHouses p h 
+    match properties with
+    | [] -> None
+    | props::remainingProps ->
+        let propsPermutations = permute props
+        propsPermutations |> List.tryFind (applyPropOnHouses houses >> isValidHouseConfiguration)
+        
+            
   
 //
 // let permute list =
@@ -215,14 +269,6 @@ let rec applyProperty (property: HouseProperty) (house: House) =
 //
 //
 //
-let ``The green house is immediately to the right of the ivory house`` =
-    lockSiblingProperties (Color Ivory) (Color Green)
-
-let ``The man who smokes Chesterfields lives in the house next to the man with the fox`` =
-    siblingProperties (OwnerCigaretteBrand Chesterfields) (OwnerPet Fox)
-
-let ``Kools are smoked in the house next to the house where the horse is kept`` =
-    siblingProperties (OwnerPet Horse) (OwnerCigaretteBrand Kools)
 //
 // let statements = [
 //     ``The Englishman lives in the red house``
